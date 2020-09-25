@@ -14,3 +14,7 @@ ie_add_sample(NAME ngraph_function_creation_sample
 
 find_package(ngraph REQUIRED)
 target_link_libraries(${TARGET_NAME} PRIVATE ${NGRAPH_LIBRARIES})
+
+target_link_libraries(${TARGET_NAME} PRIVATE ${NGRAPH_LIBRARIES} inference_engine_transformations)
+
+target_include_directories(${TARGET_NAME} PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/../../src/transformations" "${CMAKE_CURRENT_SOURCE_DIR}/../../include/gna0")
