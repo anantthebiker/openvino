@@ -84,26 +84,26 @@ std::shared_ptr<Function> createNgraphFunction() {
     //                                                     {145, 121, 204, 172},
     //                                                     {187, 247,  21, 251},
     //                                                     {154,  11, 127, 146}};
-    std::vector< uint32_t> values_weight_forgetGate_x = {1, 2, 3, 4, 5, 6 };
-                                                        // 1, 2, 3, 4, 5, 6,
-                                                        // 1, 2, 3, 4, 5, 6,
-                                                        // 1, 2, 3, 4, 5, 6}; //Its a row major vector of Constants.
+    std::vector< uint32_t> values_weight_forgetGate_x = {1, 2, 3, 4, 5, 6,
+                                                         1, 2, 3, 4, 5, 6,
+                                                         1, 2, 3, 4, 5, 6,
+                                                         1, 2, 3, 4, 5, 6}; //Its a row major vector of Constants.
     std::vector< uint32_t> values_weight_forgetGate_h = {1, 2, 3, 4, 5, 6, \
                                                         1, 2, 3, 4, 5, 6, \
                                                         1, 2, 3, 4, 5, 6, \
                                                         1, 2, 3, 4, 5, 6};
     //With 4 neurons & 4X6 connections to input layer.
-    std::shared_ptr<Node> weight_forgetGate_x = std::make_shared<op::Constant>(element::Type_t::f32, Shape{1, 6}, values_weight_forgetGate_x);
+    std::shared_ptr<Node> weight_forgetGate_x = std::make_shared<op::Constant>(element::Type_t::f32, Shape{4, 6}, values_weight_forgetGate_x);
     //With 4 neurons & 4X6 connections to previous state layer.
     std::shared_ptr<Node> weight_forgetGate_h = std::make_shared<op::Constant>(element::Type_t::f32, Shape{4, 6}, values_weight_forgetGate_h);
-    //std::vector<int32_t> values_bias_forgetGate = {1, 1, 1, 1};
-    std::vector<int32_t> values_bias_forgetGate = { 1, 1, 1, 1, 1, 1,
-                                                    1, 1, 1, 1, 1, 1,
-                                                    1, 1, 1, 1, 1, 1,
-                                                    1, 1, 1, 1, 1, 1,
-                                                    1, 1, 1, 1, 1, 1,
-                                                    1, 1, 1, 1, 1, 1};
-    std::shared_ptr<Node> bias_forgetGate = std::make_shared<op::Constant>(element::Type_t::f32, Shape{6, 6}, values_bias_forgetGate); //4 ,1 Earlier
+    std::vector<int32_t> values_bias_forgetGate = {1, 1, 1, 1};
+    // std::vector<int32_t> values_bias_forgetGate = { 1, 1, 1, 1, 1, 1,
+    //                                                 1, 1, 1, 1, 1, 1,
+    //                                                 1, 1, 1, 1, 1, 1,
+    //                                                 1, 1, 1, 1, 1, 1,
+    //                                                 1, 1, 1, 1, 1, 1,
+    //                                                 1, 1, 1, 1, 1, 1};
+    std::shared_ptr<Node> bias_forgetGate = std::make_shared<op::Constant>(element::Type_t::f32, Shape{4, 1}, values_bias_forgetGate); //4 ,1 Earlier
     std::vector<int32_t> values_zero = {0, 0, 0, 0};
     std::shared_ptr<Node> bias_zero_matrix = std::make_shared<op::Constant>(element::Type_t::f32, Shape{4, 1}, values_zero);
     std::vector<int32_t> values_identity = {1};
@@ -111,22 +111,27 @@ std::shared_ptr<Function> createNgraphFunction() {
     /*********************
     Matrix Multiplication:
     *********************/
+   //CPU STARTS-PATH TEST-UNCOMMENT TO USE:
+    // auto matMul_weightX_inpX = std::make_shared<op::MatMul>(weight_forgetGate_x, input_x);
+    // auto output_forgetGate =   matMul_weightX_inpX + bias_forgetGate; //+ matMul_weightX_inpX
+    //CPU ENDS
+    //GNA STARTS-TEST PATH:
+    auto matMul_weightX_inpX = std::make_shared<op::FullyConnected>(weight_forgetGate_x, input_x, bias_zero_matrix, Shape{4, 1});
+    auto matMul_weightH_inpH = std::make_shared<op::FullyConnected>(weight_forgetGate_h, input_x, bias_zero_matrix, Shape{4, 1});
+    //std::shared_ptr<Node> bias_forgetGate_broadcast = std::make_shared<op::Broadcast>(bias_forgetGate, Shape{4, 1}, AxisSet{1});
+    auto output_forgetGate = matMul_weightX_inpX + matMul_weightH_inpH + bias_forgetGate;//bias_forgetGate_broadcast;
+    //OR
+    //auto output_forgetGate = std::make_shared<op::Sigmoid>(matMul_weightX_inpX + matMul_weightH_inpH + bias_forgetGate_broadcast);
+    //GNA ENDS
     //auto matMul_W_X_reshape = std::make_shared<op::Broadcast>(matMul_weightX_inpX, Shape{4, 1}, AxisSet{0});
     //std::shared_ptr<Node> matmul_identity_result = std::make_shared<op::MatMul>(input_x, identity_matrix);
     //std::vector<int32_t> values_matmul_identity_result = matmul_identity_result->
     //std::shared_ptr<Node> matmul_identity_result_constant = std::make_shared<op::Constant>(element::Type_t::f32, Shape{6, 1}, *matmul_identity_result);
     //auto matMul_weightX_inpX = std::make_shared<op::MatMul>(weight_forgetGate_x, matmul_identity_result_constant);
-    auto matMul_weightX_inpX = std::make_shared<op::MatMul>(input_x, weight_forgetGate_x);
-    //auto matMul_weightX_inpX = std::make_shared<op::FullyConnected>(weight_forgetGate_x, input_x, bias_zero_matrix, Shape{4, 1});
     //auto matMul_weightH_inpH = std::make_shared<op::MatMul>(weight_forgetGate_h, input_h);
-    //auto matMul_weightH_inpH = std::make_shared<op::FullyConnected>(weight_forgetGate_h, input_x, bias_zero_matrix, Shape{4, 1});
     //auto matMul_W_H_reshape = std::make_shared<op::Broadcast>(matMul_weightH_inpH, Shape{4, 1}, AxisSet{0});
     //?? //Broadcasting Bias(4X1) to a 4X1 along column axis.
-    // std::shared_ptr<Node> bias_forgetGate_broadcast = std::make_shared<op::Broadcast>(bias_forgetGate, Shape{4, 1}, AxisSet{1});
     //output_forgetGate of type Node Therefore can be given as result.
-    //auto output_forgetGate = matMul_weightX_inpX + matMul_weightH_inpH + bias_forgetGate_broadcast;
-    auto output_forgetGate =   matMul_weightX_inpX + bias_forgetGate; //+ matMul_weightX_inpX
-    // auto output_forgetGate = std::make_shared<op::Sigmoid>(matMul_weightX_inpX + matMul_weightH_inpH + bias_forgetGate_broadcast);
     std::shared_ptr<ngraph::Function> fnPtr = std::make_shared<ngraph::Function>(OutputVector{ output_forgetGate }, ngraph::ParameterVector{ input_x }, "lstm");
     return fnPtr;
 }
@@ -191,7 +196,7 @@ int main(int argc, char* argv[]) {
         */
         std::map<std::string, std::string> config;
         std::map<std::string, std::string> gnaPluginConfig;
-        gnaPluginConfig[InferenceEngine::GNAConfigParams::KEY_GNA_DEVICE_MODE] = "GNA_SW_FP32"; //SW_FP32
+        gnaPluginConfig[InferenceEngine::GNAConfigParams::KEY_GNA_DEVICE_MODE] = "GNA_SW_FP32"; //SW_FP32 OR GNA_SW_FP32
         gnaPluginConfig[InferenceEngine::GNAConfigParams::KEY_GNA_PRECISION] = "I16";
 
         std::string scaleFactorConfigKey_1 = GNA_CONFIG_KEY(SCALE_FACTOR) + std::string("_") + std::to_string(0);
@@ -200,7 +205,9 @@ int main(int argc, char* argv[]) {
         gnaPluginConfig[scaleFactorConfigKey_2] = "32766";
         gnaPluginConfig[GNA_CONFIG_KEY(COMPACT_MODE)] = CONFIG_VALUE(NO);
         config.insert(std::begin(gnaPluginConfig), std::end(gnaPluginConfig));
-
+        /****************************
+         * ANISHA : YOU JUST NEED TO CHANGE BETWEEN GNA AND CPU BELOW.
+        *****************************/
         auto executable_network = ie.LoadNetwork(network, "CPU"); //CPU or FLAGS_d? //(network, "GNA", config) OR (network, "CPU")
         std::cout << "Have comeafter executableNetwork" << std::endl;
         auto inferRequest = executable_network.CreateInferRequest();
